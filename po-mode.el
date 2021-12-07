@@ -2269,6 +2269,7 @@ Run functions on po-subedit-mode-hook."
                 po-edited-fields (cons slot po-edited-fields))
           (pop-to-buffer edit-buffer)
           (text-mode)
+          (visual-line-mode)
           (set (make-local-variable 'po-subedit-back-pointer) slot)
           (set (make-local-variable 'indent-line-function)
                'indent-relative)

@@ -2715,8 +2715,7 @@ Disregard some simple strings which are most probably non-translatable."
     (if data
         ;; Save information for marking functions.
         (let ((buffer (current-buffer)))
-          (save-excursion
-            (set-buffer po-current-po-buffer)
+          (with-current-buffer po-current-po-buffer
             (setq po-string-contents (nth 0 data)
                   po-string-buffer buffer
                   po-string-start (nth 1 data)
@@ -2736,8 +2735,7 @@ Disregard some simple strings which are most probably non-translatable."
         (end po-string-end)
         line string)
     ;; Mark string in program sources.
-    (save-excursion
-      (set-buffer buffer)
+    (with-current-buffer buffer
       (setq line (count-lines (point-min) start))
       (apply po-mark-string-function start end keyword nil))
     ;; Add PO file entry.

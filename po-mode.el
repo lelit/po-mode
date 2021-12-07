@@ -2582,7 +2582,8 @@ without moving its cursor."
 (defun po-show-source-context (triplet)
   "Show the source context given a TRIPLET which is (PROMPT FILE LINE)."
   (find-file-other-window (car (cdr triplet)))
-  (goto-line (car (cdr (cdr triplet))))
+  (goto-char (point-min))
+  (forward-line (1- (car (cdr (cdr triplet)))))
   (other-window 1)
   (let ((maximum 0)
         position

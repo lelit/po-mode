@@ -478,6 +478,11 @@ or remove the -m if you are not using the GNU version of 'uuencode'."
   :type 'string
   :group 'po)
 
+(defcustom po-wrap-width 80
+  "*Width to which to wrap msgstrs."
+  :type 'integer
+  :group 'po)
+
 (defvar po-subedit-mode-syntax-table
   (copy-syntax-table text-mode-syntax-table)
   "Syntax table used while in PO mode.")
@@ -1728,33 +1733,52 @@ If FORM is itself a string, then this string is used for insertion."
       (push-mark)
       (eval form))
     (goto-char (point-min))
-    (let ((multi-line (re-search-forward "[^\n]\n+[^\n]" nil t)))
+    ;; If the text is wider than `po-wrap-width' split it into multiple lines
+    (let ((multi-line (or (> (- (point-max) (point-min)) po-wrap-width)
+                          (re-search-forward "[^\n]\n+[^\n]" nil t))))
       (goto-char (point-min))
       (while (re-search-forward "[\"\a\b\f\n\r\t\\]" nil t)
         (cond ((eq (preceding-char) ?\") (replace-match "\\\"" t t))
               ((eq (preceding-char) ?\a) (replace-match "\\a" t t))
               ((eq (preceding-char) ?\b) (replace-match "\\b" t t))
               ((eq (preceding-char) ?\f) (replace-match "\\f" t t))
-              ((eq (preceding-char) ?\n)
-               (replace-match (if (or (not multi-line) (eobp))
-                                  "\\n"
-                                "\\n\"\n\"")
-                              t t))
+              ((eq (preceding-char) ?\n) (replace-match "\\n" t t))
               ((eq (preceding-char) ?\r) (replace-match "\\r" t t))
               ((eq (preceding-char) ?\t) (replace-match "\\t" t t))
               ((eq (preceding-char) ?\\) (replace-match "\\\\" t t))))
       (goto-char (point-min))
       (if prefix (insert prefix " "))
-      (insert (if multi-line "\"\"\n\"" "\""))
+      (if multi-line (insert "\"\"\n"))
+      (insert "\"")
+      ;; Rewrap the text to avoid lines longer than `po-wrap-width', as
+      ;; msgfmt would do
+      (while (not (eobp))
+        ;; See where to set next linebreak
+        (let* ((start-of-line (point))
+               ;; Calculate position before which break has to occur;
+               ;; subtract 2 for the opening and closing quote
+               (max-end-of-line (+ start-of-line (- po-wrap-width 2))))
+          ;; Break at \n, no matter where it is on the line
+          (if (re-search-forward "\\\\n" max-end-of-line 'move-to-limit)
+              ;; Insert quote if not already at end of text
+              (unless (eobp) (insert "\"\n\""))
+            ;; No \n found within a line, and point is at max. end of line now
+            ;; if already at end-of-buffer, do nothing
+            (when (not (eobp))
+              ;; Search backwards for a space to break after
+              (if (re-search-backward " " start-of-line t)
+                  ;; When found a space, break after it
+                  (forward-char 1))
+              ;; In any case, break at point
+              (insert "\"\n\"")))))
       (goto-char (point-max))
       (insert "\"")
       (if prefix (insert "\n"))
-      (if obsolete
-          (progn
-            (goto-char (point-min))
-            (while (not (eobp))
-              (or (eq (following-char) ?\n) (insert "#~ "))
-              (search-forward "\n"))))
+      (when obsolete
+        (goto-char (point-min))
+        (while (not (eobp))
+          (or (eq (following-char) ?\n) (insert "#~ "))
+          (search-forward "\n")))
       (buffer-string))))
 
 (defun po-get-msgid ()

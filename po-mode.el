@@ -500,26 +500,6 @@ or remove the -m if you are not using the GNU version of 'uuencode'."
       "Return string of text matched by last search."
       (po-buffer-substring (match-beginning number) (match-end number)))))
 
-;; Handle missing 'with-temp-buffer' function.
-(eval-and-compile
-  (if (fboundp 'with-temp-buffer)
-      (fset 'po-with-temp-buffer (symbol-function 'with-temp-buffer))
-
-    (defmacro po-with-temp-buffer (&rest forms)
-      "Create a temporary buffer, and evaluate FORMS there like 'progn'."
-      (let ((curr-buffer (make-symbol "curr-buffer"))
-            (temp-buffer (make-symbol "temp-buffer")))
-        `(let ((,curr-buffer (current-buffer))
-               (,temp-buffer (get-buffer-create
-                              (generate-new-buffer-name " *po-temp*"))))
-           (unwind-protect
-               (progn
-                 (set-buffer ,temp-buffer)
-                 ,@forms)
-             (set-buffer ,curr-buffer)
-             (and (buffer-name ,temp-buffer)
-                  (kill-buffer ,temp-buffer))))))))
-
 ;; Handle missing 'kill-new' function.
 (eval-and-compile
   (if (fboundp 'kill-new)
@@ -527,7 +507,7 @@ or remove the -m if you are not using the GNU version of 'uuencode'."
 
     (defun po-kill-new (string)
       "Push STRING onto the kill ring, for Emacs 18 where kill-new is missing."
-      (po-with-temp-buffer
+      (with-temp-buffer
         (insert string)
         (kill-region (point-min) (point-max))))))
 
@@ -1708,7 +1688,7 @@ Crumb preceding or following the quoted string is ignored."
 (defun po-extract-part-unquoted (buffer start end)
   "Extract and return the unquoted string in BUFFER going from START to END.
 Surrounding quotes are already excluded by the position of START and END."
-  (po-with-temp-buffer
+  (with-temp-buffer
    (insert-buffer-substring buffer start end)
    ;; Glue concatenated strings.
    (goto-char (point-min))
@@ -1742,7 +1722,7 @@ If PREFIX, precede the result with its contents.  If OBSOLETE, comment all
 generated lines in the returned string.  Evaluating FORM should insert the
 wanted string in the buffer which is current at the time of evaluation.
 If FORM is itself a string, then this string is used for insertion."
-  (po-with-temp-buffer
+  (with-temp-buffer
     (if (stringp form)
         (insert form)
       (push-mark)
@@ -1935,7 +1915,7 @@ If KILL-FLAG, then add the unquoted comment to the kill ring."
     (save-excursion
       (goto-char po-start-of-entry)
       (if (re-search-forward po-comment-regexp po-end-of-entry t)
-          (po-with-temp-buffer
+          (with-temp-buffer
             (insert-buffer-substring buffer (match-beginning 0) (match-end 0))
             (goto-char (point-min))
             (while (not (eobp))
@@ -1953,7 +1933,7 @@ If FORM is itself a string, then this string is used for insertion.
 The string is properly recommented before the replacement occurs."
   (let ((obsolete (eq po-entry-type 'obsolete))
         string)
-    (po-with-temp-buffer
+    (with-temp-buffer
       (if (stringp form)
           (insert form)
         (push-mark)
@@ -2680,7 +2660,7 @@ Disregard some simple strings which are most probably non-translatable."
       (setq data (apply po-find-string-function po-current-po-keywords nil))
       (if data
           ;; Push the string just found into a work buffer for study.
-          (po-with-temp-buffer
+          (with-temp-buffer
            (insert (nth 0 data))
            (goto-char (point-min))
            ;; Accept if at least three letters in a row.
@@ -3162,7 +3142,7 @@ Leave point after marked string."
 (defun po-help ()
   "Provide an help window for PO mode."
   (interactive)
-  (po-with-temp-buffer
+  (with-temp-buffer
    (insert po-help-display-string)
    (goto-char (point-min))
    (save-window-excursion
@@ -3212,7 +3192,7 @@ Leave point after marked string."
 (defvar po-msgfmt-version-checked nil)
 (defun po-msgfmt-version-check ()
   "'msgfmt' from GNU gettext 0.10.36 or greater is required."
-  (po-with-temp-buffer
+  (with-temp-buffer
     (or
      ;; Don't bother checking again.
      po-msgfmt-version-checked

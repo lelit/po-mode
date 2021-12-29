@@ -1078,14 +1078,16 @@ all reachable through 'M-x customize', in group 'Emacs.Editing.I18n.Po'."
 (defvar po-mode-line-entry '(po-mode-flag ("  " po-mode-line-string))
   "Mode line format entry displaying MODE-LINE-STRING.")
 
-;; Insert MODE-LINE-ENTRY in mode line, but on first load only.
-(or (member po-mode-line-entry mode-line-format)
-    ;; mode-line-format usually contains global-mode-string, but some
-    ;; people customize this variable. As a last resort, append at the end.
-    (let ((prev-entry (or (member 'global-mode-string mode-line-format)
-                          (member "   " mode-line-format)
-                          (last mode-line-format))))
-      (setcdr prev-entry (cons po-mode-line-entry (cdr prev-entry)))))
+(if (bound-and-true-p doom-modeline-mode)
+    (add-to-list 'global-mode-string po-mode-line-entry 'append)
+  ;; Insert MODE-LINE-ENTRY in mode line, but on first load only.
+  (or (member po-mode-line-entry mode-line-format)
+      ;; mode-line-format usually contains global-mode-string, but some
+      ;; people customize this variable. As a last resort, append at the end.
+      (let ((prev-entry (or (member 'global-mode-string mode-line-format)
+                            (member "   " mode-line-format)
+                            (last mode-line-format))))
+        (setcdr prev-entry (cons po-mode-line-entry (cdr prev-entry))))))
 
 (defun po-update-mode-line-string ()
   "Compute a new statistics string to display in mode line."

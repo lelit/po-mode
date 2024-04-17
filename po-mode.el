@@ -1,7 +1,6 @@
 ;;; po-mode.el --- major mode for GNU gettext PO files
 
-;; Copyright (C) 1995-2002, 2005-2008, 2010, 2013-2017, 2019-2020 Free Software
-;; Foundation, Inc.
+;; Copyright (C) 1995-2002, 2005-2008, 2010, 2013-2017, 2019-2020, 2023 Free Software Foundation, Inc.
 
 ;; Authors: François Pinard <pinard@iro.umontreal.ca>
 ;;          Greg McGary <gkm@magilla.cichlid.com>
@@ -63,7 +62,7 @@
 
 ;;; Code:
 
-(defconst po-mode-version-string "2.27" "\
+(defconst po-mode-version-string "2.29" "\
 Version number of this version of po-mode.el.")
 
 ;;; Emacs portability matters - part I.
@@ -497,50 +496,6 @@ or remove the -m if you are not using the GNU version of 'uuencode'."
 ;;; Many portability matters are addressed in this page.  The few remaining
 ;;; cases, elsewhere, all involve  'eval-and-compile', 'boundp' or 'fboundp'.
 
-;; Protect string comparisons from text properties if possible.
-(eval-and-compile
-  (fset 'po-buffer-substring
-        (symbol-function (if (fboundp 'buffer-substring-no-properties)
-                             'buffer-substring-no-properties
-                           'buffer-substring)))
-
-  (if (fboundp 'match-string-no-properties)
-      (fset 'po-match-string (symbol-function 'match-string-no-properties))
-    (defun po-match-string (number)
-      "Return string of text matched by last search."
-      (po-buffer-substring (match-beginning number) (match-end number)))))
-
-;; Handle missing 'kill-new' function.
-(eval-and-compile
-  (if (fboundp 'kill-new)
-      (fset 'po-kill-new (symbol-function 'kill-new))
-
-    (defun po-kill-new (string)
-      "Push STRING onto the kill ring, for Emacs 18 where kill-new is missing."
-      (with-temp-buffer
-        (insert string)
-        (kill-region (point-min) (point-max))))))
-
-;; Handle missing 'read-event' function.
-(eval-and-compile
-  (fset 'po-read-event
-        (cond ((fboundp 'read-event)
-               ;; GNU Emacs.
-               'read-event)
-              (t
-               ;; Older Emacses.
-               'read-char))))
-
-;; Handle missing 'force-mode-line-update' function.
-(eval-and-compile
-  (if (fboundp 'force-mode-line-update)
-      (fset 'po-force-mode-line-update
-            (symbol-function 'force-mode-line-update))
-
-    (defun po-force-mode-line-update ()
-      "Force the mode-line of the current buffer to be redisplayed."
-      (set-buffer-modified-p (buffer-modified-p)))))
-
 ;; Handle portable highlighting.  Code has been adapted (OK... stolen! :-)
 ;; from 'ispell.el'.
 
@@ -899,7 +854,7 @@ M-S  Ignore path          M-A  Ignore PO file      *M-L  Ignore lexicon
 (defconst po-font-lock-keywords
   '(
     ("^# .*\\|^#[:,]?" . font-lock-comment-face)
-    ("^#:\\(.*\\)" 1 font-lock-reference-face)
+    ("^#:\\(.*\\)" 1 font-lock-constant-face)
     ("^#,\\(.*\\)" 1 font-lock-function-name-face)
     ("^\\(\\(msg\\(ctxt\\|id\\(_plural\\)?\\|str\\(\\[[0-9]\\]\\)?\\)\\) \\)?\"\\|\"$"
      . font-lock-keyword-face)
@@ -1014,8 +969,7 @@ all reachable through 'M-x customize', in group 'Emacs.Editing.I18n.Po'."
   (setq major-mode 'po-mode
         mode-name "PO")
   (use-local-map po-mode-map)
-  (if (fboundp 'easy-menu-define)
-      (easy-menu-define po-mode-menu po-mode-map "" po-mode-menu-layout))
+  (easy-menu-define po-mode-menu po-mode-map "" po-mode-menu-layout)
   (set (make-local-variable 'font-lock-defaults) '(po-font-lock-keywords t))
 
   (set (make-local-variable 'po-read-only) buffer-read-only)
@@ -1099,7 +1053,7 @@ all reachable through 'M-x customize', in group 'Emacs.Editing.I18n.Po'."
                     (format "+%du" po-untranslated-counter))
                 (if (> po-obsolete-counter 0)
                     (format "+%do" po-obsolete-counter))))
-  (po-force-mode-line-update))
+  (force-mode-line-update))
 
 (defun po-type-counter ()
   "Return the symbol name of the counter appropriate for the current entry."
@@ -1243,28 +1197,26 @@ Can be customized with the `po-auto-update-file-header' variable."
 
 (defun po-replace-revision-date ()
   "Replace the revision date by current time in the PO file header."
-  (if (fboundp 'format-time-string)
-      (if (or (eq po-auto-replace-revision-date t)
-              (and (eq po-auto-replace-revision-date 'ask)
-                   (y-or-n-p (_"May I set PO-Revision-Date? "))))
-          (save-excursion
-            (goto-char (point-min))
-            (if (re-search-forward "^\"PO-Revision-Date:.*" nil t)
-                (let* ((buffer-read-only po-read-only)
-                       (time (current-time))
-                       (seconds (or (car (current-time-zone time)) 0))
-                       (minutes (/ (abs seconds) 60))
-                       (zone (format "%c%02d%02d"
-                                     (if (< seconds 0) ?- ?+)
-                                     (/ minutes 60)
-                                     (% minutes 60))))
-                  (replace-match
-                       (concat "\"PO-Revision-Date: "
-                               (format-time-string "%Y-%m-%d %H:%M" time)
-                               zone "\\n\"")
-                       t t))))
-        (message ""))
-    (message (_"PO-Revision-Date should be adjusted...")))
+  (if (or (eq po-auto-replace-revision-date t)
+          (and (eq po-auto-replace-revision-date 'ask)
+               (y-or-n-p (_"May I set PO-Revision-Date? "))))
+      (save-excursion
+        (goto-char (point-min))
+        (if (re-search-forward "^\"PO-Revision-Date:.*" nil t)
+            (let* ((buffer-read-only po-read-only)
+                   (time (current-time))
+                   (seconds (or (car (current-time-zone time)) 0))
+                   (minutes (/ (abs seconds) 60))
+                   (zone (format "%c%02d%02d"
+                                 (if (< seconds 0) ?- ?+)
+                                 (/ minutes 60)
+                                 (% minutes 60))))
+              (replace-match
+                   (concat "\"PO-Revision-Date: "
+                           (format-time-string "%Y-%m-%d %H:%M" time)
+                           zone "\\n\"")
+                   t t))))
+    (message ""))
   ;; Return nil to indicate that the buffer has not yet been saved.
   nil)
 
@@ -1838,7 +1790,7 @@ described by FORM is merely identical to the msgid already in place."
     (save-excursion
       (goto-char po-start-of-entry)
       (re-search-forward po-any-msgid-regexp po-start-of-msgstr-block)
-      (and (not (string-equal (po-match-string 0) string))
+      (and (not (string-equal (match-string-no-properties 0) string))
            (let ((buffer-read-only po-read-only))
              (replace-match string t t)
              (goto-char po-start-of-msgid)
@@ -1859,7 +1811,7 @@ described by FORM is merely identical to the msgstr already in place."
     (save-excursion
       (goto-char po-start-of-msgstr-form)
       (re-search-forward po-any-msgstr-form-regexp po-end-of-msgstr-form)
-      (and (not (string-equal (po-match-string 0) string))
+      (and (not (string-equal (match-string-no-properties 0) string))
            (let ((buffer-read-only po-read-only))
              (po-decrease-type-counter)
              (replace-match string t t)
@@ -1873,7 +1825,7 @@ described by FORM is merely identical to the msgstr already in place."
   (interactive)
   (po-find-span-of-entry)
   (let ((string (po-get-msgstr-form)))
-    (po-kill-new string)
+    (kill-new string)
     string))
 
 (defun po-kill-msgstr ()
@@ -1927,7 +1879,7 @@ or completely delete an obsolete entry, saving its msgstr on the kill ring."
          (po-decrease-type-counter)
          (po-update-mode-line-string)
          ;; TODO: Should save all msgstr forms here, not just one.
-         (po-kill-new (po-get-msgstr-form))
+         (kill-new (po-get-msgstr-form))
          (let ((buffer-read-only po-read-only))
            (delete-region po-start-of-entry po-end-of-entry))
          (goto-char po-start-of-entry)
@@ -1983,7 +1935,7 @@ The string is properly recommented before the replacement occurs."
       (setq string (buffer-string)))
     (goto-char po-start-of-entry)
     (if (re-search-forward po-comment-regexp po-end-of-entry t)
-        (if (not (string-equal (po-match-string 0) string))
+        (if (not (string-equal (match-string-no-properties 0) string))
             (let ((buffer-read-only po-read-only))
               (replace-match string t t)))
       (skip-chars-forward " \t\n")
@@ -2297,9 +2249,8 @@ Run functions on po-subedit-mode-hook."
           (goto-char (point-min))
           (and expand-tabs (setq indent-tabs-mode nil))
           (use-local-map po-subedit-mode-map)
-          (if (fboundp 'easy-menu-define)
-              (easy-menu-define po-subedit-mode-menu po-subedit-mode-map ""
-                po-subedit-mode-menu-layout))
+          (easy-menu-define po-subedit-mode-menu po-subedit-mode-map ""
+            po-subedit-mode-menu-layout)
           (set-syntax-table po-subedit-mode-syntax-table)
           (run-hooks 'po-subedit-mode-hook)
           (message po-subedit-message)))))
@@ -2567,8 +2518,8 @@ without moving its cursor."
           (let (current name line path file)
             (while (looking-at "\\(\n#:\\)? *\\([^: ]*\\):\\([0-9]+\\)")
               (goto-char (match-end 0))
-              (setq name (po-match-string 2)
-                    line (po-match-string 3)
+              (setq name (match-string-no-properties 2)
+                    line (match-string-no-properties 3)
                     path po-search-path)
               (if (string-equal name "")
                   nil
@@ -2847,7 +2798,7 @@ Return (CONTENTS START END) for the found string, or nil if none found."
                         (backward-char 1)
                         (let ((end-keyword (point)))
                           (skip-chars-backward "_A-Za-z0-9")
-                          (if (member (list (po-buffer-substring
+                          (if (member (list (buffer-substring-no-properties
                                              (point) end-keyword))
                                       keywords)
                               ;; Disregard already marked strings.
@@ -2973,8 +2924,8 @@ Returns (CONTENTS START END) for the found string, or nil if none found."
                      (skip-chars-backward " \n\t")
                      (let ((end-keyword (point)))
                        (skip-chars-backward "_A-Za-z0-9")
-                       (if (member (list (po-buffer-substring (point)
-                                                              end-keyword))
+                       (if (member (list (buffer-substring-no-properties (point)
+                                                                         end-keyword))
                                    keywords)
                            ;; Disregard already marked strings.
                            (progn
@@ -3027,8 +2978,8 @@ Returns (CONTENTS START END) for the found string, or nil if none found."
                (let ((end-keyword (point)))
                  (skip-chars-backward "-_A-Za-z0-9")
                  (if (and (= (preceding-char) ?\()
-                          (member (list (po-buffer-substring (point)
-                                                             end-keyword))
+                          (member (list (buffer-substring-no-properties (point)
+                                                                        end-keyword))
                                   keywords))
                      ;; Disregard already marked strings.
                      (progn
@@ -3086,8 +3037,8 @@ Returns (CONTENTS START END) for the found string, or nil if none found."
                     (skip-chars-backward " \n\t")
                     (let ((end-keyword (point)))
                       (skip-chars-backward "_A-Za-z0-9")
-                      (if (member (list (po-buffer-substring (point)
-                                                             end-keyword))
+                      (if (member (list (buffer-substring-no-properties (point)
+                                                                        end-keyword))
                                   keywords)
                           ;; Disregard already marked strings.
                           (setq contents nil)))))
@@ -3190,7 +3141,7 @@ Leave point after marked string."
      (switch-to-buffer (current-buffer))
      (delete-other-windows)
      (message (_"Type any character to continue"))
-     (po-read-event))))
+     (read-event))))
 
 (defun po-undo ()
   "Undo the last change to the PO file."
@@ -3282,8 +3233,8 @@ Leave point after marked string."
       (if (re-search-forward "\n\
 \"Project-Id-Version: \\(GNU \\|Free \\)?\\([^\n ]+\\) \\([^\n ]+\\)\\\\n\"$"
            end-of-header t)
-          (setq package (po-match-string 2)
-                version (po-match-string 3)))
+          (setq package (match-string-no-properties 2)
+                version (match-string-no-properties 3)))
       (if (or (not package) (string-equal package "PACKAGE")
               (not version) (string-equal version "VERSION"))
           (error (_"Project-Id-Version field does not have a proper value")))
@@ -3293,11 +3244,11 @@ Leave point after marked string."
             (;; TP Robot compatible `filename': PACKAGE-VERSION.LL.po
              (string-match (concat (regexp-quote package)
                                    "-\\(.*\\)\\.[^\\.]*\\.po\\'") filename)
-             (if (not (equal version (po-match-string 1 filename)))
+             (if (not (equal version (match-string-no-properties 1 filename)))
                  (error (_"\
 Version mismatch: file name: %s; header: %s.\n\
 Adjust Project-Id-Version field to match file name and try again")
-                        (po-match-string 1 filename) version))))
+                        (match-string-no-properties 1 filename) version))))
       ;; Get the team.
       (if (stringp po-team-name-to-code)
           (setq team po-team-name-to-code)
@@ -3305,7 +3256,7 @@ Adjust Project-Id-Version field to match file name and try again")
         (if (re-search-forward "\n\
 \"Language-Team: \\([^ ].*[^ ]\\) <.+@.+>\\\\n\"$"
                                end-of-header t)
-            (let ((name (po-match-string 1)))
+            (let ((name (match-string-no-properties 1)))
               (if name
                   (let ((pair (assoc name po-team-name-to-code)))
                     (if pair
@@ -3328,10 +3279,10 @@ Team name '%s' unknown.  What is the team code? "
       (if (re-search-forward
            "\n\"Language-Team: +\\(.*<\\(.*\\)@.*>\\)\\\\n\"$"
            (match-end 0) t)
-          (setq team (po-match-string 2)))
+          (setq team (match-string-no-properties 2)))
       (if (or (not team) (string-equal team "LL"))
           (error (_"Language-Team field does not have a proper value")))
-      (po-match-string 1))))
+      (match-string-no-properties 1))))
 
 (defun po-send-mail ()
   "Start composing a letter, possibly including the current PO file."

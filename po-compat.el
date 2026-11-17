@@ -33,7 +33,7 @@
 ;; for editing PO files, see po-mode.el.
 
 ;;; Code:
-
+
 ;;; Emacs portability matters.
 
 (defconst po-content-type-charset-alist

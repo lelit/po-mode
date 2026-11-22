@@ -198,6 +198,13 @@ slightly different."
   :type 'face
   :group 'po)
 
+(defcustom po-subedit-center-msgid t
+  "*Auto-center the msgid in the main window when editing msgstr.
+When non-nil, the msgid will be positioned near the top of the window
+when you edit the msgstr in a sub-buffer, making it easy to reference
+while translating."
+  :type 'boolean
+  :group 'po)
 (defcustom po-team-name-to-code
   ;; All possible languages, a complete ISO 639 list, the inverse of
   ;; gettext-tools/src/lang-table.c, and a little more.
@@ -2289,17 +2296,23 @@ Run functions on po-subedit-mode-hook."
               (buffer (current-buffer))
               overlay slot)
           (if (and (eq type 'msgstr) po-highlighting)
-              ;; ;; Try showing all of msgid in the upper window while editing.
-              ;; (goto-char (1- po-start-of-msgstr-block))
-              ;; (recenter -1)
-              (save-excursion
-                (goto-char po-start-of-entry)
-                (re-search-forward po-any-msgid-regexp nil t)
-                (let ((end (1- (match-end 0))))
-                  (goto-char (match-beginning 0))
-                  (re-search-forward "msgid +" nil t)
-                  (setq overlay (po-create-overlay))
-                  (po-highlight overlay (point) end buffer))))
+              ;; When editing msgstr, center the msgid in the main window
+              ;; for easy reference while translating
+              (progn
+                (if po-subedit-center-msgid
+                    (progn
+                      ;; Position the msgid near the top of the window
+                      (goto-char (1- po-start-of-msgstr-block))
+                      (recenter -1)))
+                ;; Highlight the msgid string to make it stand out
+                (save-excursion
+                  (goto-char po-start-of-entry)
+                  (re-search-forward po-any-msgid-regexp nil t)
+                  (let ((end (1- (match-end 0))))
+                    (goto-char (match-beginning 0))
+                    (re-search-forward "msgid +" nil t)
+                    (setq overlay (po-create-overlay))
+                    (po-highlight overlay (point) end buffer)))))
           (setq slot (list marker edit-buffer overlay)
                 po-edited-fields (cons slot po-edited-fields))
           (pop-to-buffer edit-buffer)
